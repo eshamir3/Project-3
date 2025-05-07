@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mouse Temperature Comparison</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: "Times New Roman", serif;
+      margin: 20px;
+    }
+  
+    h2 {
+      font-size: 24px;
+    }
+  
+    svg {
+      width: 100%;
+      height: 600px;
+    }
+  
+    .line {
+      fill: none;
+      stroke-width: 2.5px;
+    }
+  
+    .female {
+      stroke: deeppink;
+    }
+  
+    .male {
+      stroke: steelblue;
+    }
+  
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #aaa;
+      padding: 6px 10px;
+      font-size: 14px;
+      font-family: "Times New Roman", serif;
+      pointer-events: none;
+      border-radius: 4px;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.1);
+    }
+  
+    .axis-label {
+      font-size: 18px;
+      font-family: "Times New Roman", serif;
+    }
+  
+    .tick text {
+      font-size: 14px;
+      font-family: "Times New Roman", serif;
+    }
+  </style>
+  
+</head>
+<body>
+  <h2>Average Core Body Temperature: Male vs Female Mice (14 Days)</h2>
+  <svg></svg>
+  <div class="tooltip" style="opacity: 0;"></div>
+
+  <!-- Your full JS code goes here -->
+  <script>
+    const margin = {top: 50, right: 140, bottom: 50, left: 90},
+          width = 1000 - margin.left - margin.right,
+          height = 500 - margin.top - margin.bottom;
+
+    const svg = d3.select("svg")
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const tooltip = d3.select(".tooltip");
+
+    Promise.all([
+      d3.csv("data/female_temp.csv", d3.autoType),
+      d3.csv("data/male_temp.csv", d3.autoType)
+    ]).then(([femaleData, maleData]) => {
+      const femaleKeys = femaleData.columns.map(d => d.trim());
+      const maleKeys = maleData.columns.map(d => d.trim());
+
+      function avgSeries(data, keys) {
+        return data.map((row, i) => {
+          const vals = keys.map(k => +row[k]).filter(d => !isNaN(d));
+          return { time: i, value: d3.mean(vals) };
+        });
+      }
+
+      const femaleAvg = avgSeries(femaleData, femaleKeys);
+      const maleAvg = avgSeries(maleData, maleKeys);
+
+      const x = d3.scaleLinear()
+        .domain([0, femaleAvg.length])
+        .range([0, width]);
+
+      const y = d3.scaleLinear()
+        .domain([
+          d3.min([...femaleAvg, ...maleAvg], d => d.value),
+          d3.max([...femaleAvg, ...maleAvg], d => d.value)
+        ])
+        .range([height, 0]);
+
+      const line = d3.line()
+        .x(d => x(d.time))
+        .y(d => y(d.value));
+
+      svg.append("g").call(d3.axisLeft(y));
+      svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(14).tickFormat(d => `Day ${Math.floor(d / 1440) + 1}`));
+
+        // Add Y-axis label
+    svg.append("text")
+    .attr("class", "axis-label")
+    .attr("transform", "rotate(-90)")
+    .attr("y", -50)
+    .attr("x", -height / 2)
+    .attr("text-anchor", "middle")
+    .text("Core Body Temperature (°C)");
+
+    // Add X-axis label
+    svg.append("text")
+    .attr("class", "axis-label")
+    .attr("x", width / 2)
+    .attr("y", height + 40)
+    .attr("text-anchor", "middle")
+    .text("Time (Minutes)");
+
+
+      svg.append("path").datum(femaleAvg).attr("class", "line female").attr("d", line);
+      svg.append("path").datum(maleAvg).attr("class", "line male").attr("d", line);
+
+      svg.append("rect").attr("x", width + 40).attr("y", 10).attr("width", 12).attr("height", 12).attr("fill", "hotpink");
+      svg.append("text").attr("x", width + 60).attr("y", 20).text("Female");
+
+      svg.append("rect").attr("x", width + 40).attr("y", 30).attr("width", 12).attr("height", 12).attr("fill", "steelblue");
+      svg.append("text").attr("x", width + 60).attr("y", 40).text("Male");
+
+      const hoverLine = svg.append("line")
+        .attr("stroke", "#888")
+        .attr("stroke-width", 1)
+        .attr("y1", 0)
+        .attr("y2", height)
+        .style("opacity", 0);
+
+      svg.append("rect")
+        .attr("fill", "none")
+        .attr("pointer-events", "all")
+        .attr("width", width)
+        .attr("height", height)
+        .on("mousemove", function (event) {
+          const [mx] = d3.pointer(event);
+          const i = Math.round(x.invert(mx));
+
+          if (i >= 0 && i < femaleAvg.length) {
+            const fx = x(i);
+            hoverLine.attr("x1", fx).attr("x2", fx).style("opacity", 1);
+
+            const fTemp = femaleAvg[i]?.value?.toFixed(2) ?? "N/A";
+            const mTemp = maleAvg[i]?.value?.toFixed(2) ?? "N/A";
+            const day = Math.floor(i / 1440) + 1;
+            const minute = i % 1440;
+
+            tooltip
+              .html(`<strong>Day ${day}, Min ${minute}</strong><br>
+                     Female: <span style="color:hotpink">${fTemp}°C</span><br>
+                     Male: <span style="color:steelblue">${mTemp}°C</span>`)
+              .style("left", `${event.pageX + 10}px`)
+              .style("top", `${event.pageY - 30}px`)
+              .style("opacity", 1);
+          }
+        })
+        .on("mouseout", () => {
+          hoverLine.style("opacity", 0);
+          tooltip.style("opacity", 0);
+        });
+    });
+  </script>
+</body>
+</html>

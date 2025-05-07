@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mouse Activity Rhythms (Radial View)</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: "Times New Roman", serif;
+      text-align: center;
+      margin: 30px;
+    }
+    .label {
+      font-size: 16px;
+    }
+    .legend-label {
+      font-size: 14px;
+    }
+    .tooltip {
+      position: absolute;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 8px 12px;
+      font-size: 14px;
+      border-radius: 4px;
+      pointer-events: none;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h2>Mouse Activity Rhythms: Female vs Male (Radial View)</h2>
+  <svg width="1000" height="600"></svg>
+  <div class="tooltip" style="opacity: 0;"></div>
+
+  <script>
+    const width = 1000, height = 600;
+    const svg = d3.select("svg");
+    const tooltip = d3.select(".tooltip");
+    const radius = 180;
+    const centerY = height / 2;
+    const color = d3.scaleSequential(d3.interpolateInferno).clamp(true);
+
+    Promise.all([
+      d3.csv("data/fem_act.csv", d3.autoType),
+      d3.csv("data/male_act.csv", d3.autoType)
+    ]).then(([femData, maleData]) => {
+      const femaleKeys = femData.columns.map(d => d.trim());
+      const maleKeys = maleData.columns.map(d => d.trim());
+
+      function averageByMinute(data, keys) {
+        const result = Array(1440).fill(0).map(() => []);
+        data.forEach((row, i) => {
+          const minuteOfDay = i % 1440;
+          const values = keys.map(k => +row[k]);
+          result[minuteOfDay].push(d3.mean(values));
+        });
+        return result.map(vals => d3.mean(vals));
+      }
+
+      const femaleAvg = averageByMinute(femData, femaleKeys);
+      const maleAvg = averageByMinute(maleData, maleKeys);
+      const maxVal = d3.max([...femaleAvg, ...maleAvg]);
+      color.domain([0, maxVal]);
+
+      function drawRadial(data, cx, label) {
+        const g = svg.append("g").attr("transform", `translate(${cx},${centerY})`);
+        const arcGen = d3.arc()
+          .innerRadius(radius - 20)
+          .outerRadius(radius)
+          .startAngle((d, i) => (i * 2 * Math.PI) / 1440)
+          .endAngle((d, i) => ((i + 1) * 2 * Math.PI) / 1440);
+
+        // Arcs
+        g.selectAll("path")
+          .data(data)
+          .join("path")
+          .attr("d", arcGen)
+          .attr("fill", d => color(d));
+
+        // Hour labels
+        const hours = [
+          "12 AM", "1 AM", "2 AM", "3 AM", "4 AM", "5 AM",
+          "6 AM", "7 AM", "8 AM", "9 AM", "10 AM", "11 AM",
+          "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM",
+          "6 PM", "7 PM", "8 PM", "9 PM", "10 PM", "11 PM"
+        ];
+        const hourRadius = radius + 12;
+        g.selectAll("text.hour")
+          .data(hours)
+          .join("text")
+          .attr("x", (_, i) => Math.sin((i / 24) * 2 * Math.PI) * hourRadius)
+          .attr("y", (_, i) => -Math.cos((i / 24) * 2 * Math.PI) * hourRadius)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "10px")
+          .text(d => d);
+
+        // Label
+        g.append("text")
+          .attr("y", -radius - 25)
+          .attr("text-anchor", "middle")
+          .attr("class", "label")
+          .text(label);
+
+        // Hover line
+        const hoverLine = g.append("line")
+          .attr("stroke", "#fff")
+          .attr("stroke-width", 2)
+          .attr("y1", 0)
+          .attr("y2", -radius)
+          .style("opacity", 0);
+
+        // Hover tracking circle
+        g.append("circle")
+          .attr("r", radius + 20)
+          .attr("fill", "transparent")
+          .on("mousemove", function(event) {
+            const [mx, my] = d3.pointer(event);
+            const angle = Math.atan2(my, mx) - Math.PI / 2;
+            const adjusted = (angle * 180 / Math.PI + 360) % 360;
+            const minute = Math.floor((adjusted / 360) * 1440);
+            const hour = Math.floor(minute / 60);
+            const min = minute % 60;
+            const val = data[minute]?.toFixed(1) ?? "N/A";
+
+            hoverLine
+              .attr("x1", 0)
+              .attr("y1", 0)
+              .attr("x2", Math.sin(angle + Math.PI / 2) * radius)
+              .attr("y2", -Math.cos(angle + Math.PI / 2) * radius)
+              .style("opacity", 1);
+
+            tooltip
+              .html(`<strong>${label}</strong><br>${String(hour % 12 || 12)}:${min.toString().padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}<br>Activity: ${val}`)
+              .style("left", `${event.pageX + 10}px`)
+              .style("top", `${event.pageY - 30}px`)
+              .style("opacity", 1);
+          })
+          .on("mouseout", () => {
+            hoverLine.style("opacity", 0);
+            tooltip.style("opacity", 0);
+          });
+      }
+
+      drawRadial(femaleAvg, 300, "Female");
+      drawRadial(maleAvg, 700, "Male");
+
+      // Color legend
+      const legendW = 200, legendH = 15;
+      const defs = svg.append("defs");
+      const gradient = defs.append("linearGradient")
+        .attr("id", "legendGradient")
+        .attr("x1", "0%").attr("x2", "100%").attr("y1", "0%").attr("y2", "0%");
+      for (let i = 0; i <= 100; i++) {
+        gradient.append("stop")
+          .attr("offset", i + "%")
+          .attr("stop-color", color((i / 100) * maxVal));
+      }
+
+      svg.append("rect")
+        .attr("x", width / 2 - legendW / 2)
+        .attr("y", height - 60)
+        .attr("width", legendW)
+        .attr("height", legendH)
+        .style("fill", "url(#legendGradient)");
+
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height - 65)
+        .attr("text-anchor", "middle")
+        .attr("class", "legend-label")
+        .text("Minutes Active per Minute (Average)");
+
+      svg.append("text")
+        .attr("x", width / 2 - legendW / 2)
+        .attr("y", height - 35)
+        .attr("text-anchor", "start")
+        .attr("font-size", "12px")
+        .text("0");
+
+      svg.append("text")
+        .attr("x", width / 2 + legendW / 2)
+        .attr("y", height - 35)
+        .attr("text-anchor", "end")
+        .attr("font-size", "12px")
+        .text(maxVal.toFixed(1));
+    });
+  </script>
+</body>
+</html>
