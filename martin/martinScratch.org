@@ -70,6 +70,7 @@ fax1.scatter(x=ftmpGroup.index, y=ftmpGroup['avg'])
 fax2.scatter(x=factGroup.index, y=factGroup['avg'], color='tab:red')
 # max1.scatter(x=mtmpGroup.index, y=mtmpGroup['avg'], color='tab:blue')
 # max2.scatter(x=mactGroup.index, y=mactGroup['avg'], color='tab:green')
+plt.title('temp and activity (blue and red) throughout the day')
 plt.savefig(filename)
 plt.close()
 filename
@@ -80,27 +81,42 @@ filename
 
 Plot of standard Deviation of average minute temp and activity throught the day, grouped by the hour. noting that lights are on from [12-24), and off from [0-12). (could shade that in plot, and change the grouping for interactivity? group by # of minutes?)
 
-** Somehow plot bedtimes?
+** Somehow plot end of day?
 #+begin_src python :results file :session
 filename = 'plots/granularGrouping.png'
 
 def groupByinc(data, incriment):
-    data['minute'] = data['time'].apply(lambda x: x.minute)
-    data = data.groupby([pd.Grouper(key='time', freq='1d'), pd.Grouper(key='time', freq=f'{incriment}min')])
-    return data
+    data = data.set_index('time')
+    data['grouper'] = (data.index - data.index.normalize()).seconds
+    data['grouper'] = (data['grouper'] // (incriment * 60)) * (incriment * 60)
+    return data.groupby('grouper')
 
-filtered = femTemp[(femTemp['hour'] >= 5) & (femTemp['hour'] < 12)]
+# filtered = femTemp[(femTemp['hour'] >= 5) & (femTemp['hour'] < 12)]
 
-tempGranular = groupByinc(filtered[['time', 'avg']], 5).std()
-# plt.scatter(x=tempGranular.index, y=tempGranular['avg'])
-# plt.savefig(filename)
-# plt.close()
+def recoverHrs(secs):
+    return secs / (60 * 60)
+
+tempGranular = groupByinc(femTemp[['time', 'avg']], 15).std()
+tempGranular.index = recoverHrs(tempGranular.index)
+
+mtempGranular = groupByinc(maleTemp[['time', 'avg']], 15).std()
+mtempGranular.index = recoverHrs(mtempGranular.index)
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+ax1.plot(tempGranular.index, tempGranular['avg'])
+ax1.set_title('females')
+ax2.plot(mtempGranular.index, mtempGranular['avg'])
+ax2.set_title('males')
+fig.suptitle('Std of temp over 15 min incriments')
+fig.savefig(filename)
+plt.close()
 filename
 #+end_src
 
 #+RESULTS:
 [[file:plots/granularGrouping.png]]
 
+There is an interesting pattern here in the variance of the temperature where it becomes very shaky between 8 hrs and 12 hrs. Interestingly it seems to be shaky overall. Additional,y the males have much more variable tempurature after the 15 hour mark (during sleep), while the females have a much more variable temp beforehand. Also, male temps are unsurprisingly much less stable
 * Notes
 ** Things you /could/ plot
 *** Temp stability thoughout day
