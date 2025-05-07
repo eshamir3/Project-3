@@ -1,0 +1,110 @@
+#+title: Martin Scratch
+#+author: Martin Hawks
+#+startup: inlineimages
+
+* Setup
+** Data Imports and formating
+#+begin_src python :session :results none
+from pathlib import Path
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+def readData(path):
+    data = pd.read_csv(path, index_col=False)
+    data['time'] = pd.Series(data.index).apply(lambda x: pd.Timestamp(x, unit='m'))
+    return data
+
+
+femTemp = readData('mouseData_femTemp.csv')
+femAct = readData('mouseData_femAct.csv')
+maleTemp = readData('mouseData_maleTemp.csv')
+maleAct = readData('mouseData_maleAct.csv')
+#+end_src
+
+* Testing Plots
+** Variation of movement with temperature
+#+begin_src python :results file :session
+figname = 'plots/moveVtmp.png'
+femTemp['avg'] = femTemp.drop(columns=['time']).mean(axis=1)
+maleTemp['avg'] = maleTemp.drop(columns=['time']).mean(axis=1)
+femAct['avg'] = femAct.drop(columns=['time']).mean(axis=1)
+maleAct['avg'] = maleAct.drop(columns=['time']).mean(axis=1)
+
+fig, ax = plt.subplots()
+ax.scatter(x=maleTemp['avg'], y=maleAct['avg'])
+fig.savefig(figname)
+plt.close()
+figname
+#+end_src
+
+#+RESULTS:
+[[file:plots/moveVtmp.png]]
+
+** Variance over time
+#+begin_src python :session :results file
+filename = 'plots/stdHour.png'
+
+def addCols(df):
+    df['hour'] = df['time'].apply(lambda x: x.hour)
+    return
+
+def groupHour(df):
+    return df[['avg', 'hour']].groupby('hour').std()
+
+addCols(femTemp)
+addCols(femAct)
+addCols(maleTemp)
+addCols(maleAct)
+
+ftmpGroup = groupHour(femTemp)
+factGroup = groupHour(femAct)
+mtmpGroup = groupHour(maleTemp)
+mactGroup = groupHour(maleTemp)
+
+
+fig, fax1  = plt.subplots(1, figsize=(8, 4))
+fax2 = fax1.twinx()
+
+fax1.scatter(x=ftmpGroup.index, y=ftmpGroup['avg'])
+fax2.scatter(x=factGroup.index, y=factGroup['avg'], color='tab:red')
+# max1.scatter(x=mtmpGroup.index, y=mtmpGroup['avg'], color='tab:blue')
+# max2.scatter(x=mactGroup.index, y=mactGroup['avg'], color='tab:green')
+plt.savefig(filename)
+plt.close()
+filename
+#+end_src
+
+#+RESULTS:
+[[file:plots/stdHour.png]]
+
+Plot of standard Deviation of average minute temp and activity throught the day, grouped by the hour. noting that lights are on from [12-24), and off from [0-12). (could shade that in plot, and change the grouping for interactivity? group by # of minutes?)
+
+** Somehow plot bedtimes?
+#+begin_src python :results file :session
+filename = 'plots/granularGrouping.png'
+
+def groupByinc(data, incriment):
+    data['minute'] = data['time'].apply(lambda x: x.minute)
+    data = data.groupby([pd.Grouper(key='time', freq='1d'), pd.Grouper(key='time', freq=f'{incriment}min')])
+    return data
+
+filtered = femTemp[(femTemp['hour'] >= 5) & (femTemp['hour'] < 12)]
+
+tempGranular = groupByinc(filtered[['time', 'avg']], 5).std()
+# plt.scatter(x=tempGranular.index, y=tempGranular['avg'])
+# plt.savefig(filename)
+# plt.close()
+filename
+#+end_src
+
+#+RESULTS:
+[[file:plots/granularGrouping.png]]
+
+* Notes
+** Things you /could/ plot
+*** Temp stability thoughout day
+*** Variation of activity with temperature
+this gives a big blob. Probably interesting things here, but not visible by directly plotting.
+**** What about variance at different times of day?
+*** Male/Female comparison of any of the above
