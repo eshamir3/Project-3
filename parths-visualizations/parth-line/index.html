@@ -1,0 +1,29 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mouse Temperature Line Chart</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    .tooltip {
+      position: absolute;
+      background-color: white;
+      border: 1px solid #ccc;
+      padding: 5px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>Mouse Temperature Over Time</h2>
+  <label for="mouseDropdown">Select Mouse:</label>
+  <select id="mouseDropdown"></select>
+  <svg id="chart" width="1000" height="500"></svg>
+  <div class="tooltip"></div>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mouse Activity Heatmap</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    .tooltip {
+      position: absolute;
+      background-color: white;
+      padding: 5px;
+      border: 1px solid #ccc;
+      font-size: 12px;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>Mouse Activity Heatmap</h2>
+  <label for="mouseSelect">Choose a mouse:</label>
+  <select id="mouseSelect"></select>
+  <br><br>
+  <svg id="heatmap" width="1000" height="600"></svg>
+  <div class="tooltip" style="opacity: 0;"></div>
+  <script src="script_hourly.js"></script>
+</body>
+</html>
+
