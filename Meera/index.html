@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Optimized Mouse Activity & Temp</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    .chart { display: flex; flex-wrap: wrap; }
+    svg { margin: 10px; }
+    .line { fill: none; stroke: steelblue; stroke-width: 1.5px; }
+    #mouseSelect { margin: 10px; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+<label for="mouseSelect">Select Mouse: </label>
+<select id="mouseSelect"></select>
+
+<div class="chart">
+  <svg id="wheel" width="300" height="300"></svg>
+  <svg id="lineChart" width="600" height="300"></svg>
+</div>
+
+<script>
+const startTime = new Date("2024-01-01T00:00:00");
+const getTimeFromMinute = m => new Date(startTime.getTime() + m * 60000);
+
+let allTempData = [], allActivityData = [], currentMouse = null;
+let fullActivityData = [];
+let lineX, lineY, lineSvg, xAxis;
+const svgWheel = d3.select("#wheel");
+const svgLine = d3.select("#lineChart");
+
+Promise.all([
+  d3.csv("./data/fem_mouse_temp.csv"),
+  d3.csv("./data/fem_mouse_act.csv")
+]).then(([rawTemp, rawAct]) => {
+  const mouseIDs = Object.keys(rawTemp[0]).filter(k => k !== "");
+
+  // Convert temperature to long format
+  allTempData = [];
+  rawTemp.forEach((row, i) => {
+    mouseIDs.forEach(mouse => {
+      allTempData.push({
+        minute: +i,
+        time: getTimeFromMinute(i),
+        mouse: mouse,
+        temp: +row[mouse]
+      });
+    });
+  });
+
+  // Convert activity to long format
+  allActivityData = [];
+  rawAct.forEach((row, i) => {
+    mouseIDs.forEach(mouse => {
+      allActivityData.push({
+        minute: +i,
+        time: getTimeFromMinute(i),
+        mouse: mouse,
+        activity: +row[mouse]
+      });
+    });
+  });
+
+  // Populate dropdown
+  const select = d3.select("#mouseSelect");
+  select.selectAll("option")
+    .data(mouseIDs)
+    .enter()
+    .append("option")
+    .text(d => d);
+
+  select.on("change", function () {
+    currentMouse = this.value;
+    updateVisualizations();
+  });
+
+  currentMouse = mouseIDs[0];
+  updateVisualizations();
+});
+
+function updateVisualizations() {
+  const rawTemp = allTempData.filter(d => d.mouse === currentMouse);
+  const downsampledTemp = rawTemp.filter((d, i) => i % 10 === 0); // downsample
+  const activity = allActivityData.filter(d => d.mouse === currentMouse);
+
+  drawWheel(downsampledTemp);
+  drawLineChart(activity);
+}
+
+function drawWheel(data) {
+  svgWheel.selectAll("*").remove();
+
+  const width = +svgWheel.attr("width"),
+        height = +svgWheel.attr("height"),
+        radius = Math.min(width, height) / 2 - 10;
+
+  const g = svgWheel.append("g")
+    .attr("transform", `translate(${width / 2},${height / 2})`);
+
+  const arc = d3.arc()
+    .innerRadius(radius - 30)
+    .outerRadius(radius);
+
+  const pie = d3.pie()
+    .sort(null)
+    .value(1); // equal slice size
+
+  const color = d3.scaleSequential(d3.interpolateCool)
+    .domain(d3.extent(data, d => d.temp));
+
+  g.selectAll("path")
+    .data(pie(data))
+    .enter().append("path")
+    .attr("d", arc)
+    .attr("fill", d => color(d.data.temp))
+    .on("click", function (e, d) {
+      d3.selectAll("#wheel path").attr("stroke", null);
+      d3.select(this).attr("stroke", "black").attr("stroke-width", 2);
+      updateLineChart(d.data.time);
+    });
+}
+
+function drawLineChart(data) {
+  svgLine.selectAll("*").remove();
+
+  fullActivityData = data;
+
+  const margin = { top: 20, right: 30, bottom: 30, left: 50 },
+        width = +svgLine.attr("width") - margin.left - margin.right,
+        height = +svgLine.attr("height") - margin.top - margin.bottom;
+
+  lineX = d3.scaleTime().range([0, width]);
+  lineY = d3.scaleLinear().range([height, 0]);
+
+  lineSvg = svgLine.append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  lineX.domain(d3.extent(data, d => d.time));
+  lineY.domain([0, d3.max(data, d => d.activity)]);
+
+  xAxis = lineSvg.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(lineX));
+
+  lineSvg.append("g").call(d3.axisLeft(lineY));
+
+  lineSvg.append("path")
+    .datum(data)
+    .attr("class", "line")
+    .attr("d", d3.line()
+      .x(d => lineX(d.time))
+      .y(d => lineY(d.activity))
+    );
+}
+
+function updateLineChart(centerTime) {
+  const window = 1000 * 60 * 60 * 6; // 6 hours
+  const start = new Date(centerTime.getTime() - window / 2);
+  const end = new Date(centerTime.getTime() + window / 2);
+
+  const filtered = fullActivityData.filter(d => d.time >= start && d.time <= end);
+
+  lineX.domain([start, end]);
+  xAxis.transition().duration(500).call(d3.axisBottom(lineX));
+
+  d3.select(".line")
+    .datum(filtered)
+    .transition().duration(500)
+    .attr("d", d3.line()
+      .x(d => lineX(d.time))
+      .y(d => lineY(d.activity))
+    );
+}
+</script>
+
+</body>
+</html>
+
