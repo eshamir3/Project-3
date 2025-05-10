@@ -81,7 +81,7 @@ filename
 
 Plot of standard Deviation of average minute temp and activity throught the day, grouped by the hour. noting that lights are on from [12-24), and off from [0-12). (could shade that in plot, and change the grouping for interactivity? group by # of minutes?)
 
-** Somehow plot end of day?
+** Ploting over different timescales
 #+begin_src python :results file :session
 filename = 'plots/granularGrouping.png'
 
@@ -96,10 +96,11 @@ def groupByinc(data, incriment):
 def recoverHrs(secs):
     return secs / (60 * 60)
 
-tempGranular = groupByinc(femTemp[['time', 'avg']], 15).std()
+time = 20
+tempGranular = groupByinc(femTemp[['time', 'avg']], time).std()
 tempGranular.index = recoverHrs(tempGranular.index)
 
-mtempGranular = groupByinc(maleTemp[['time', 'avg']], 15).std()
+mtempGranular = groupByinc(maleTemp[['time', 'avg']], time).std()
 mtempGranular.index = recoverHrs(mtempGranular.index)
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
