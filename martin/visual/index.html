@@ -1,21 +1,22 @@
 <!doctype html>
 <html class="no-js" lang="">
 
-    <head>
-        <meta charset="utf-8">
-        <meta http-equiv="x-ua-compatible" content="ie=edge">
-        <title>Visualizarion</title>
-        <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <script type='module' src='vis.js'></script>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>Visualizarion</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script type='module' src='vis.js'></script>
+    <link href="style.css" rel="stylesheet" />
 
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-        <!-- Place favicon.ico in the root directory -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <!-- Place favicon.ico in the root directory -->
 
-    </head>
+</head>
 
-    <body>
-        <!--[if lt IE 8]>
+<body>
+    <!--[if lt IE 8]>
                 <p class="browserupgrade">
                 You are using an <strong>outdated</strong> browser. Please
                 <a href="http://browsehappy.com/">upgrade your browser</a> to improve
@@ -23,10 +24,16 @@
                 </p>
             <![endif]-->
 
-        <div id="femTempPlot"></div>
-        <div id="linePlot"></div>
-        <div id="maletempPlot"></div>
+    <div id="femTempPlot" class='plot'></div>
+    <div id="linePlot" class='plot'></div>
+    <div id="maletempPlot"></div>
+    <dl id="tooltip" class="info tooltip" style="visibility: hidden">
+        <dt class="temp">Temperature</dt>
+        <dd id="temp" class="temp">
+        <dt class="time">Time of Day</dt>
+        <dd id="time" class="time"></dd>
+    </dl>
 
-    </body>
+</body>
 
 </html>

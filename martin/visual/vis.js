@@ -1,13 +1,6 @@
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm';
 
 
-
-
-// global scope variables
-let scaleColor = d3.scaleLinear();
-let xScale = d3.scaleTime();
-let activeMouse = [0,0];
-
 // Functions
 
 
@@ -76,13 +69,13 @@ function renderCirclePlot(data, elemId) {
     .attr("transform", `translate(${width / 2}, ${height / 2})`);
 
   // Build the axis for the plot
-  xScale = d3.scaleTime()
+  let xScale = d3.scaleTime()
     .domain([new Date(d3.min(data, (d) => d.time)), new Date(d3.max(data, (d) => d.time))])
     .range([0, 2 * Math.PI]);
 
 
 
-  scaleColor = d3.scaleLinear()
+  let scaleColor = d3.scaleLinear()
     .domain([d3.min(data, d => d.average), d3.max(data, d => d.average)])
     .range(["blue", "red"]);
 
@@ -111,8 +104,28 @@ function renderCirclePlot(data, elemId) {
     .attr("x2", d => Math.cos(xScale(d.time) - Math.PI / 2) * outerRadius)
     .attr("y2", d => Math.sin(xScale(d.time) - Math.PI / 2) * outerRadius)
     .attr("stroke", d => scaleColor(d.average))
-    .attr("stroke-width", 2);
-
+    .attr("stroke-width", 2)
+    .on('mouseover', function (event, point) {
+      // TODO add tooltip
+      // just call a tooltip renderer
+      // and use that, which can render
+      // a tooltip anywhere with the given
+      // data...
+      // Can map elem id to groups of plots, and get
+      // the circle plot in this function,
+      // and the line in the other renderer,
+      // and the tooltip can also use that to
+      // render both items on the plots
+      // renderTooltip(event, point, elemId)
+      d3.select('#tooltip').style('visibility', 'visible');
+      renderTooltip(event, point, elemId);
+      renderActTool(event, elemId, xScale);
+      d3.select(this).attr('stroke', 'Black').attr('stroke-width', 4);
+    })
+    .on('mouseleave', function (event, point) {
+      d3.select('#tooltip').style('visibility', 'hidden');
+      d3.select(this).attr('stroke', d => scaleColor(d.average)).attr('stroke-width', 2);
+    });
 
   svg.selectAll(".time-label")
     .data(data.filter((_, i) => i % 60 === 0)) // Label every hour
@@ -124,28 +137,79 @@ function renderCirclePlot(data, elemId) {
     .attr("text-anchor", "middle")
     .attr("alignment-baseline", "middle")
     .style("font-size", "10px")
-    .text(d => d3.timeFormat("%H:%M")(d.time))
-    .on('mouseover', (event, point) => {
-      // TODO add tooltip
-      // just call a tooltip renderer
-      // and use that, which can render
-      // a tooltip anywhere with the given
-      // data...
-      // but should also be able to render
-      // tooltip on the corralary plot...
-    })
-    .on('mouseleave', (event, point) =>{
-
-    });
+    .text(d => d3.timeFormat("%H:%M")(d.time));
 }
 
-fuction renderTooltit(event, data) {
-  const temp = data.average;
-  const time = data.time;
+function renderTooltip(event, data, elemId) {
+  const tooltip = d3.select('#tooltip');
+  const temp = document.getElementById('temp');
+  const time = document.getElementById('time');
+  const activity = document.getElementById('activity');
+
+  temp.textContent = data.average.toPrecision(4);
+  time.textContent = data.time.toLocaleTimeString(); // FIXME if this doesn't work
+  tooltip.style('left', `${event.clientX}px`);
+  tooltip.style('top', `${event.clientY}px`);
+}
+
+function renderActTool(event, elemId, xScale) {
+  let pltsvg = d3.select(elemId).select('.linePlot');
+
+}
+
+function renderActPlot(data, elemId) {
+
+  const margin = { top: 20, right: 30, bottom: 30, left: 50 };
+  const width = 800 - margin.left - margin.right;
+  const height = 400 - margin.top - margin.bottom;
+
+  let xScale = d3.scaleTime()
+    .domain([new Date(d3.min(data, (d) => d.time)), new Date(d3.max(data, (d) => d.time))])
+    .range([0, width]);
+
+  let yScale = d3.scaleLinear()
+    .domain([d3.min(data, d => d.average), d3.max(data, d => d.average)])
+    .range([height, 0]);
+
+  const xAxis = d3.axisBottom(xScale).tickFormat(d3.timeFormat("%H:%M"));
+  const yAxis = d3.axisLeft(yScale);
+
+  // Plot the data
+  const svg = d3.select(elemId)
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .attr('class', 'linePlot')
+    .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  svg.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(xAxis);
+
+  const line = d3.line()
+    .x(d => xScale(d.time)) // x position based on time
+    .y(d => yScale(d.average)) // y position based on temperature
+    .curve(d3.curveMonotoneX);
+
+  svg.append("g")
+    .call(yAxis);
+
+  svg.append("path")
+    .datum(data) // Bind the data
+    .attr("fill", "none") // No area fill
+    .attr("stroke", "steelblue") // Line color
+    .attr("stroke-width", 2) // Line thickness
+    .attr("d", line);
+
 }
 
 
 const femTemp = await loadData('data/mouseData_femTemp.csv');
 renderCirclePlot(femTemp, '#femTempPlot');
-const maleTemp = await loadData('data/mouseData_maleTemp.csv')
-renderCirclePlot(maleTemp, '#maletempPlot')
+const maleTemp = await loadData('data/mouseData_maleTemp.csv');
+renderCirclePlot(maleTemp, '#maletempPlot');
+const femAct = await loadData('data/mouseData_femAct.csv');
+renderActPlot(femAct, '#femTempPlot');
+const maleAct = await loadData('data/mouseData_maleAct.csv');
+renderActPlot(maleAct, '#maletempPlot');
